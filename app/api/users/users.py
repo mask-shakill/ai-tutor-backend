@@ -1,25 +1,23 @@
-# app/api/users.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.database.connection import db
 from app.models.user_reg_model import UserCreate
+from app.api.users.user_service import hash_password, create_access_token
 
-# Create the router instance
 router = APIRouter()
 
-# Endpoint to register a new user
-@router.post("/users/")
+@router.post("/users/register")
 async def create_user(user: UserCreate):
-    # Check if user already exists (using email as the unique identifier)
-    existing_user = db["users"].find_one({"email": user.email})
-    if existing_user:
+    if db["users"].find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Prepare the user data for insertion
     user_data = {
+        "name": user.name,
         "email": user.email,
-        "password": user.password  # No encryption here, storing plain password
+        "password": hash_password(user.password),
+        "phone": user.phone
     }
 
-    # Insert the new user into the 'users' collection
     db["users"].insert_one(user_data)
-    return {"message": "User created successfully"}
+    access_token = create_access_token({"email": user.email})
+
+    return {"message": "User created successfully", "token": access_token}
